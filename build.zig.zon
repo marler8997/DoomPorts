@@ -1,0 +1,29 @@
+.{
+    .name = "doomports",
+    .version = "0.0.0",
+    .minimum_zig_version = "0.12.0",
+    .dependencies = .{
+        .puredoom = .{
+            .url = "https://github.com/daivuk/puredoom/archive/48376ddd6bbdb70085dab91feb1c6ceef80fa9b7.tar.gz",
+            .hash = "1220842c3b12a72c9ae9aef09cae99067d2cf8e826a4659a24c826e4b598c9323662",
+        },
+        .embedded_doom = .{
+            .url = "https://github.com/cnlohr/embeddedDOOM/archive/68d3f729913185fda994bb9f09af66c02990a49e.tar.gz",
+            .hash = "1220855848034ca50d3bba6d7d289696f2d16cd0c3022d1956aa9600a208672a6e9e",
+        },
+        .sycl_badge = .{
+            .url = "https://github.com/ZigEmbeddedGroup/sycl-badge/archive/7a7a250e164273b3cee9d8b0c8c2d1b0cedd9686.tar.gz",
+            .hash = "12209d52e975be6d3d6593006228de6c947375c13875dd292f2d541c424af238f695",
+            //.lazy = true,
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "doom.template.html",
+        "main.zig",
+        "makedoomhtml.zig",
+        "PureDOOM.c",
+        "readwad.zig",
+    },
+}

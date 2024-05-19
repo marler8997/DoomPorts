@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<title>DOOM</title>
+<style>
+* { margin: 0; padding: 0 }
+html, body {
+  height: 100%;
+  overflow:hidden;
+}
+body {
+  background-color:#000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+canvas {
+  display: block;
+}
+</style>
+<script>
+const wasm_base64 = "<@INSERT_WASM_HERE@>";
+var global_wasm = undefined;
+var global_screen_palette_addr;
+var global_fb_addr;
+var global_current_log = "";
+var global_wasm_last_size_sent = undefined;
+const wasm_env = {
+    logWrite: function(ptr, len) {
+        global_current_log += readStr(global_wasm.memory.buffer, ptr, len);
+    },
+    logFlush: function() {
+        console.log(global_current_log);
+        global_current_log = "";
+    },
+    getTimeMillis() {
+        return Date.now();
+    },
+};
+WebAssembly.instantiate(
+    Uint8Array.from(atob(wasm_base64), c => c.charCodeAt(0)).buffer,
+    { env: wasm_env }
+).then(wasm => {
+    global_wasm = wasm.instance.exports;
+    global_screen_palette_addr = global_wasm.get_screen_palette();
+    global_fb_addr = global_wasm.init();
+});
+function readStr(buffer, ptr, len) {
+    const array = new Uint8Array(buffer, ptr, len);
+    const decoder = new TextDecoder();
+    return decoder.decode(array);
+}
+function encodeStr(str) {
+    const encoder = new TextEncoder();
+    return encoder.encode(str);
+}
+function writeEncodedStr(buffer, ptr, encoded_str) {
+    const dest = new Uint8Array(buffer, ptr, encoded_str.length);
+    for (let i = 0; i < encoded_str.length; i++) {
+        dest[i] = encoded_str[i];
+    }
+}
+
+function fatal(msg) {
+    console.log("fatal: " + msg);
+    alert(msg);
+}
+
+function allocStr(str) {
+    const encoded = encodeStr(str);
+    const ptr = global_wasm.alloc(encoded.length);
+    if (ptr == 0) {
+        fatal("WASM is out of memory");
+        return { ptr: 0, len: 0 };
+    }
+    writeEncodedStr(global_wasm.memory.buffer, ptr, encoded);
+    return { ptr: ptr, len: encoded.length };
+}
+
+const DOOM_WIDTH = 320;
+const DOOM_HEIGHT = 200;
+const DOOM_AR = DOOM_WIDTH/DOOM_HEIGHT;
+var global_canvas;
+var global_ctx;
+var global_hidden_canvas;
+function onTick() {
+    global_wasm.update();
+    drawDoom(global_hidden_ctx);
+
+    const max_width = window.innerWidth;
+    const max_height = window.innerHeight;
+
+    const width_candidate = max_height * DOOM_AR;
+    const height_candidate = max_width / DOOM_AR;
+    //console.log(max_width + "x" + max_height + "  " + width_candidate + "x" + height_candidate);
+    var width;
+    var height;
+    if (height_candidate >= max_height) {
+        width = width_candidate;
+        height = max_height;
+    } else {
+        width = max_width;
+        height = height_candidate;
+    }
+    global_canvas.width = width;
+    global_canvas.height = height;
+    global_ctx.drawImage(
+        global_hidden_canvas,
+        0, 0,
+        global_canvas.width, global_canvas.height
+    );
+}
+function drawDoom(ctx) {
+    let palette = new Uint8Array(
+        global_wasm.memory.buffer,
+        global_screen_palette_addr,
+        3*256
+    );
+    let fb = new Uint8Array(
+        global_wasm.memory.buffer,
+        global_fb_addr,
+        DOOM_WIDTH*DOOM_HEIGHT
+    );
+    let imageData = ctx.createImageData(DOOM_WIDTH, DOOM_HEIGHT);
+    let i = 0;
+    for (let y = 0; y < DOOM_HEIGHT; y++) {
+        for (let x = 0; x < DOOM_WIDTH; x++) {
+            const ci = fb[i] * 3;
+            imageData.data[4*i + 0] = palette[ci + 0]; // red
+            imageData.data[4*i + 1] = palette[ci + 1]; // green
+            imageData.data[4*i + 2] = palette[ci + 2]; // blue
+            imageData.data[4*i + 3] = 255;
+            i += 1;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function bodyOnLoad() {
+    global_canvas = document.getElementById('Canvas');
+    global_ctx = global_canvas.getContext('2d');
+
+    global_hidden_canvas = document.createElement('canvas');
+    global_hidden_canvas.width = DOOM_WIDTH;
+    global_hidden_canvas.height = DOOM_HEIGHT;
+    global_hidden_ctx = global_hidden_canvas.getContext('2d');
+
+    setInterval(onTick, 28);
+}
+
+</script>
+</head><body onload="bodyOnLoad()">
+<canvas id="Canvas"></canvas>
+</body></html>
